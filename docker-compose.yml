@@ -1,0 +1,33 @@
+version: '3'
+
+networks:
+  api:
+    driver: bridge
+  api2:
+    driver: bridge
+
+services:
+  nats:
+    image: 'nats'
+    ports:
+      - "4222:4222"
+    networks:
+      - api
+      - api2
+  pg:
+    build:
+      dockerfile: Go-auth-service/deployments/DockerfileDb
+    ports:
+      - "5433:5432"
+    networks:
+      - api
+      - api2
+  go-auth:
+    build:
+      context: ./Go-auth-service
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8080"
+    networks:
+      - api
+      - api2
