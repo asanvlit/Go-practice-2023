@@ -4,6 +4,7 @@ import (
 	"Golang-practice-2023/internal/transport/rest/handler"
 	"Golang-practice-2023/internal/user/repository"
 	"Golang-practice-2023/internal/user/service"
+	"Golang-practice-2023/pkg/health"
 	"Golang-practice-2023/pkg/logger"
 	"Golang-practice-2023/pkg/migration"
 	"Golang-practice-2023/pkg/pgconnect"
@@ -91,6 +92,13 @@ func main() {
 
 	router := mux.NewRouter()
 	userHandler.InitRoutes(router)
+	router.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte(fmt.Sprintf("[%s] pong", time.Now())))
+		if err != nil {
+			// todo
+		}
+	})
 
 	defer cancel()
 	defer publisher.Conn.Close()
@@ -111,9 +119,25 @@ func main() {
 		}
 	}()
 
+	fmt.Println("Hi! 1")
+
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	signal.Notify(c, syscall.SIGTERM)
+
+	fmt.Println("Hi! 2")
+
+	healthSrv, err := health.New(os.Getenv("HEALTH_PORT"), 1, myLogger, c)
+	if err != nil {
+		//logger todo
+		fmt.Println(err)
+	}
+
+	go func() {
+		healthSrv.HealthCheck()
+	}()
+
+	fmt.Println("Hi! 3")
 
 	sig := <-c
 	myLogger.Info(fmt.Sprintf("shutting down the server, received signal : %s", sig.String()))

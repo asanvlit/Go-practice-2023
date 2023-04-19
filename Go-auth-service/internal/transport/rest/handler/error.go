@@ -16,6 +16,7 @@ type Error struct {
 func HandleError(w http.ResponseWriter, err error) error {
 	switch errors.Cause(err) {
 	case myErrors.ErrUserNotFound:
+		// todo err :=
 		return myHttp.BuildResponse(Error{Code: 404, Message: err.Error()}, w, contentType, http.StatusNotFound)
 	}
 	return nil
