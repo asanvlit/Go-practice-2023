@@ -5,19 +5,23 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
 type Server struct {
 	Srv         *http.Server
-	pingFreq    int32
+	healthPort  int
+	host        string
+	pingFreq    int
+	pingUrl     string
 	stopChannel chan os.Signal
-	logger      logger.Logger // todo another params
+	logger      logger.Logger
 }
 
-func New(port string, freq int32, logger logger.Logger, stopChannel chan os.Signal) (*Server, error) {
+func New(healthPort int, host string, pingUrl string, freq int, logger logger.Logger, stopChannel chan os.Signal) (*Server, error) {
 	srv := &http.Server{
-		Addr: ":" + port,
+		Addr: ":" + strconv.Itoa(healthPort),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}),
@@ -25,39 +29,41 @@ func New(port string, freq int32, logger logger.Logger, stopChannel chan os.Sign
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
-			logger.Fatal(fmt.Sprintf("Health check server error [after calling ListenAndServe]: " + err.Error()))
+			logger.Fatal(fmt.Sprintf("Failed to start Health Server [after calling ListenAndServe]: %s", err.Error()))
 		}
 	}()
 
 	return &Server{
 		Srv:         srv,
+		healthPort:  healthPort,
+		host:        host,
 		pingFreq:    freq,
+		pingUrl:     pingUrl,
 		stopChannel: stopChannel,
 		logger:      logger,
 	}, nil
 }
 
 func (hs *Server) HealthCheck() {
-	hs.logger.Warning("Health server: started working")
-
 	pingTimer := time.NewTicker(time.Duration(hs.pingFreq) * time.Minute)
 	defer pingTimer.Stop()
 
 	for {
 		select {
 		case <-pingTimer.C:
-			hs.logger.Warning("Try ping...")
+			url := "http://" + hs.host + ":" + strconv.Itoa(hs.healthPort) + hs.pingUrl
+			hs.logger.Warning(fmt.Sprintf("Ping %s ...", url))
 
-			client := &http.Client{Timeout: time.Second}
+			client := &http.Client{Timeout: 5 * time.Second}
 
-			resp, err := client.Get("http://" + os.Getenv("HOST") + ":" + os.Getenv("PORT") + "/ping")
+			resp, err := client.Get(url)
 
 			if err != nil || resp.StatusCode != http.StatusOK {
-				hs.logger.Warning("Error calling ping")
+				hs.logger.Warning("Unsuccessful ping.")
 				hs.stopChannel <- os.Interrupt
+			} else {
+				hs.logger.Warning("Ping successful")
 			}
-
-			hs.logger.Warning("Ping successful")
 		}
 	}
 }

@@ -29,8 +29,6 @@ import (
 )
 
 func main() {
-	fmt.Println("It's work")
-
 	envPath, envErr := filepath.Abs("dev.env")
 	if envErr != nil {
 		log.Fatal("Can't get environment file")
@@ -119,15 +117,15 @@ func main() {
 		}
 	}()
 
-	fmt.Println("Hi! 1")
-
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	signal.Notify(c, syscall.SIGTERM)
 
-	fmt.Println("Hi! 2")
-
-	healthSrv, err := health.New(os.Getenv("HEALTH_PORT"), 1, myLogger, c)
+	healthPort, err := strconv.Atoi(os.Getenv("HEALTH_PORT"))
+	if err != nil {
+		myLogger.Fatal("Failed to get health port")
+	}
+	healthSrv, err := health.New(healthPort, os.Getenv("HOST"), "/ping", 1, myLogger, c)
 	if err != nil {
 		//logger todo
 		fmt.Println(err)
@@ -136,8 +134,6 @@ func main() {
 	go func() {
 		healthSrv.HealthCheck()
 	}()
-
-	fmt.Println("Hi! 3")
 
 	sig := <-c
 	myLogger.Info(fmt.Sprintf("shutting down the server, received signal : %s", sig.String()))
