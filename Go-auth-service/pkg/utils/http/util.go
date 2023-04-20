@@ -15,7 +15,7 @@ func ValidateRequestFormat(r *http.Request, expectedContentType string) error {
 	return nil
 }
 
-func BuildResponse(data interface{}, w http.ResponseWriter, contentType string, status int) error {
+func WriteResponse(data interface{}, w http.ResponseWriter, contentType string, status int) error {
 	if resp, err := json.Marshal(data); err == nil {
 		w.Header().Set("Content-Type", contentType)
 		w.WriteHeader(status)

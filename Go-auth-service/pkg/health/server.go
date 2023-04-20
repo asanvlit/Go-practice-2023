@@ -19,7 +19,7 @@ type Server struct {
 	logger      logger.Logger
 }
 
-func New(healthPort int, host string, pingUrl string, freq int, logger logger.Logger, stopChannel chan os.Signal) (*Server, error) {
+func New(healthPort int, pingHost string, pingUrl string, freq int, logger logger.Logger, stopChannel chan os.Signal) (*Server, error) {
 	srv := &http.Server{
 		Addr: ":" + strconv.Itoa(healthPort),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +36,7 @@ func New(healthPort int, host string, pingUrl string, freq int, logger logger.Lo
 	return &Server{
 		Srv:         srv,
 		healthPort:  healthPort,
-		host:        host,
+		host:        pingHost,
 		pingFreq:    freq,
 		pingUrl:     pingUrl,
 		stopChannel: stopChannel,
@@ -52,17 +52,17 @@ func (hs *Server) HealthCheck() {
 		select {
 		case <-pingTimer.C:
 			url := "http://" + hs.host + ":" + strconv.Itoa(hs.healthPort) + hs.pingUrl
-			hs.logger.Warning(fmt.Sprintf("Ping %s ...", url))
+			hs.logger.Info(fmt.Sprintf("Ping %s ...", url))
 
 			client := &http.Client{Timeout: 5 * time.Second}
 
 			resp, err := client.Get(url)
 
-			if err != nil || resp.StatusCode != http.StatusOK {
+			if err == nil && resp.StatusCode == http.StatusOK {
+				hs.logger.Info("Ping successful.")
+			} else {
 				hs.logger.Warning("Unsuccessful ping.")
 				hs.stopChannel <- os.Interrupt
-			} else {
-				hs.logger.Warning("Ping successful")
 			}
 		}
 	}

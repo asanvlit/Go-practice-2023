@@ -1,11 +1,10 @@
 package repository
 
 import (
-	myErrors "Golang-practice-2023/internal/domain/apperrors"
+	"Golang-practice-2023/internal/domain/apperrors"
 	"Golang-practice-2023/internal/domain/logger"
 	"Golang-practice-2023/internal/domain/user"
 	"context"
-	"errors"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
@@ -29,7 +28,10 @@ func (r *Repository) Create(ctx context.Context, user *user.User) error {
 	row := r.db.QueryRowContext(ctx, query, user.Email, user.Passwordhash)
 	err := row.Scan(&user.ID)
 	if err != nil {
-		return err
+		if u, _ := r.GetByEmail(ctx, user.Email); u != nil {
+			return apperrors.ErrAlreadyRegisteredUserEmail
+		}
+		return apperrors.ErrDbQueryProcessing
 	}
 
 	return nil
@@ -41,7 +43,19 @@ func (r *Repository) GetById(ctx context.Context, id uuid.UUID) (*user.User, err
 	var u user.User
 	err := r.db.GetContext(ctx, &u, query, id)
 	if err != nil {
-		return nil, myErrors.ErrUserNotFound
+		return nil, apperrors.ErrUserNotFound
+	}
+
+	return &u, nil
+}
+
+func (r *Repository) GetByEmail(ctx context.Context, email string) (*user.User, error) {
+	query := "SELECT id, email, passwordhash FROM account WHERE email=$1"
+
+	var u user.User
+	err := r.db.GetContext(ctx, &u, query, email)
+	if err != nil {
+		return nil, apperrors.ErrUserNotFound
 	}
 
 	return &u, nil
@@ -52,15 +66,15 @@ func (r *Repository) Update(ctx context.Context, user *user.User) error {
 
 	result, err := r.db.ExecContext(ctx, query, user.Email, user.Passwordhash, user.ID)
 	if err != nil {
-		return err
+		return apperrors.ErrDbQueryProcessing
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return err
+		return apperrors.ErrDbQueryProcessing
 	}
 	if rowsAffected == 0 {
-		return errors.New("account not found")
+		return apperrors.ErrUserNotFound
 	}
 
 	return nil
@@ -71,15 +85,18 @@ func (r *Repository) Delete(ctx context.Context, id uuid.UUID) error {
 
 	result, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
-		return err
+		return apperrors.ErrDbQueryProcessing
 	}
 
+	if u, _ := r.GetById(ctx, id); u == nil {
+		return apperrors.ErrUserNotFound
+	}
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return err
+		return apperrors.ErrDbQueryProcessing
 	}
 	if rowsAffected == 0 {
-		return errors.New("account not found")
+		return apperrors.ErrUserNotFound
 	}
 
 	return nil

@@ -31,25 +31,25 @@ import (
 func main() {
 	envPath, envErr := filepath.Abs("dev.env")
 	if envErr != nil {
-		log.Fatal("Can't get environment file")
+		log.Fatal(fmt.Sprintf("Can't get environment file: %s", envErr))
 	}
 
 	err := godotenv.Load(envPath)
 	if err != nil {
-		log.Fatal("Error loading .env file: " + err.Error())
+		log.Fatal(fmt.Sprintf("Error loading .env file: %s", err.Error()))
 	}
 
 	zeroLogLogger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 	myLogger, err := logger.New(os.Getenv("LOG_LEVEL"), &zeroLogLogger)
 	if err != nil {
-		fmt.Println("* " + err.Error())
+		log.Fatal(fmt.Sprintf("Error creating logger: %s", err))
 	}
 
 	_, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
 	pgPort, err := strconv.Atoi(os.Getenv("POSTGRES_PORT"))
 	if err != nil {
-		myLogger.Fatal("Failed to get Postgresql port")
+		myLogger.Fatal(fmt.Sprintf("Failed to get Postgresql port: %s", err))
 	}
 	db, err := pgconnect.ConnectDatabase(pgconnect.ConnectionConfigData{
 		Username:     os.Getenv("POSTGRES_USERNAME"),
@@ -63,38 +63,38 @@ func main() {
 	migrationData, err := migration.New(db.DB, "file://schemas")
 	err = migrationData.Up()
 	if err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		myLogger.Fatal(err.Error())
+		myLogger.Fatal(fmt.Sprintf("Failed to migrate: %s", err.Error()))
 	} else {
-		myLogger.Warning(err.Error())
+		myLogger.Warning(fmt.Sprintf("Did not migrate: %s", err.Error()))
 	}
 
 	publisher, err := pub.New(fmt.Sprintf("nats://%s:%s", os.Getenv("NATS_HOST"), os.Getenv("NATS_PORT")), myLogger)
 	if err != nil {
-		myLogger.Warning(err.Error())
+		myLogger.Fatal(fmt.Sprintf("Failed to connect NATS: %s", err.Error()))
 	}
 
 	subscriber, err := sub.New(fmt.Sprintf("nats://%s:%s", os.Getenv("NATS_HOST"), os.Getenv("NATS_PORT")), myLogger)
 	_, err = subscriber.Subscribe("NewUser", func(msg *nats.Msg) {
 		fmt.Println("Received message: " + string(msg.Data))
 	})
+	if err != nil {
+		myLogger.Warning("Failed to subscribe")
+	}
 
 	userRepository := repository.New(db, myLogger)
 	userService := service.New(userRepository, myLogger, publisher)
 	userHandler := handler.New(userService, myLogger)
-
-	if err != nil {
-		myLogger.Warning("Failed to subscribe")
-	}
 
 	port := os.Getenv("PORT")
 
 	router := mux.NewRouter()
 	userHandler.InitRoutes(router)
 	router.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte(fmt.Sprintf("[%s] pong", time.Now())))
 		if err != nil {
-			// todo
+			myLogger.Warning("Failed to write response")
 		}
 	})
 
@@ -123,12 +123,11 @@ func main() {
 
 	healthPort, err := strconv.Atoi(os.Getenv("HEALTH_PORT"))
 	if err != nil {
-		myLogger.Fatal("Failed to get health port")
+		myLogger.Fatal(fmt.Sprintf("Failed to get health port: %s", err.Error()))
 	}
-	healthSrv, err := health.New(healthPort, os.Getenv("HOST"), "/ping", 1, myLogger, c)
+	healthSrv, err := health.New(healthPort, os.Getenv("HOST"), "/ping", 5, myLogger, c)
 	if err != nil {
-		//logger todo
-		fmt.Println(err)
+		myLogger.Fatal(fmt.Sprintf("Failed to start Health server: %s", err))
 	}
 
 	go func() {

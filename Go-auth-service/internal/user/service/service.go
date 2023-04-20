@@ -1,6 +1,7 @@
 package service
 
 import (
+	"Golang-practice-2023/internal/domain/apperrors"
 	"Golang-practice-2023/internal/domain/logger"
 	"Golang-practice-2023/internal/domain/user"
 	"Golang-practice-2023/pkg/pubsub/nats/pub"
@@ -8,7 +9,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"github.com/google/uuid"
 	"regexp"
 )
@@ -39,15 +39,16 @@ func (service *Service) Create(ctx context.Context, user *user.User) error {
 		return err
 	}
 
-	//createdUserData := []byte(fmt.Sprintf("%s %s", user.ID, user.Email)) todo remove
 	createdUserData, err := json.Marshal(user)
 	if err != nil {
 		service.logger.Warning("Failed to marshal user")
+		return apperrors.ErrInternalJsonProcessing
 	}
 
 	err = service.nats.Publish("NewUser", createdUserData)
 	if err != nil {
 		service.logger.Warning("Failed to push user data to nats")
+		return apperrors.ErrNatsPublishing
 	}
 
 	return err
@@ -86,12 +87,12 @@ func (service *Service) Delete(ctx context.Context, id uuid.UUID) error {
 
 func validateEmail(email string) error {
 	if email == "" {
-		return errors.New("email is empty")
+		return apperrors.ErrInvalidEmailFormat
 	}
 
 	emailRegex := regexp.MustCompile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
 	if !emailRegex.MatchString(email) {
-		return errors.New("invalid email format")
+		return apperrors.ErrInvalidEmailFormat
 	}
 
 	return nil
@@ -99,12 +100,12 @@ func validateEmail(email string) error {
 
 func validatePassword(password string) error {
 	if password == "" {
-		return errors.New("password is empty")
+		return apperrors.ErrInvalidPasswordFormat
 	}
 
 	passwordRegex := regexp.MustCompile("^[a-zA-Z0-9@#$%!]{8,60}$") // fixme reg exp
 	if !passwordRegex.MatchString(password) {
-		return errors.New("invalid password format")
+		return apperrors.ErrInvalidPasswordFormat
 	}
 
 	return nil
