@@ -62,10 +62,12 @@ func main() {
 
 	migrationData, err := migration.New(db.DB, "file://schemas")
 	err = migrationData.Up()
-	if err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		myLogger.Fatal(fmt.Sprintf("Failed to migrate: %s", err.Error()))
-	} else {
-		myLogger.Warning(fmt.Sprintf("Did not migrate: %s", err.Error()))
+	if err != nil {
+		if errors.Is(err, migrate.ErrNoChange) {
+			myLogger.Warning(fmt.Sprintf("Did not migrate: %s", err.Error()))
+		} else {
+			myLogger.Fatal(fmt.Sprintf("Failed to migrate: %s", err.Error()))
+		}
 	}
 
 	publisher, err := pub.New(fmt.Sprintf("nats://%s:%s", os.Getenv("NATS_HOST"), os.Getenv("NATS_PORT")), myLogger)

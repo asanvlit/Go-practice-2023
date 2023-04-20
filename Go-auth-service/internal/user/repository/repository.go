@@ -23,14 +23,16 @@ func (r *Repository) GetDbInstance() *sqlx.DB {
 }
 
 func (r *Repository) Create(ctx context.Context, user *user.User) error {
-	query := "INSERT INTO account (email, passwordhash) VALUES ($1, $2) RETURNING id"
+	if u, _ := r.GetByEmail(ctx, user.Email); u != nil {
+		return apperrors.ErrAlreadyRegisteredUserEmail
+	}
+
+	query := "INSERT INTO account (email, passwordhash) VALUES ($1, $2) RETURNING id, createdAt, updatedAt"
 
 	row := r.db.QueryRowContext(ctx, query, user.Email, user.Passwordhash)
-	err := row.Scan(&user.ID)
+	err := row.Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
-		if u, _ := r.GetByEmail(ctx, user.Email); u != nil {
-			return apperrors.ErrAlreadyRegisteredUserEmail
-		}
+		r.logger.Warning(err.Error())
 		return apperrors.ErrDbQueryProcessing
 	}
 
@@ -38,7 +40,7 @@ func (r *Repository) Create(ctx context.Context, user *user.User) error {
 }
 
 func (r *Repository) GetById(ctx context.Context, id uuid.UUID) (*user.User, error) {
-	query := "SELECT id, email, passwordhash FROM account WHERE id=$1"
+	query := "SELECT id, email, passwordhash, createdAt, updatedAt FROM account WHERE id=$1"
 
 	var u user.User
 	err := r.db.GetContext(ctx, &u, query, id)
@@ -50,7 +52,7 @@ func (r *Repository) GetById(ctx context.Context, id uuid.UUID) (*user.User, err
 }
 
 func (r *Repository) GetByEmail(ctx context.Context, email string) (*user.User, error) {
-	query := "SELECT id, email, passwordhash FROM account WHERE email=$1"
+	query := "SELECT id, email, passwordhash, createdAt, updatedAt  FROM account WHERE email=$1"
 
 	var u user.User
 	err := r.db.GetContext(ctx, &u, query, email)
@@ -62,19 +64,17 @@ func (r *Repository) GetByEmail(ctx context.Context, email string) (*user.User, 
 }
 
 func (r *Repository) Update(ctx context.Context, user *user.User) error {
-	query := "UPDATE account SET email=$1, passwordhash=$2 WHERE id=$3"
-
-	result, err := r.db.ExecContext(ctx, query, user.Email, user.Passwordhash, user.ID)
-	if err != nil {
-		return apperrors.ErrDbQueryProcessing
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return apperrors.ErrDbQueryProcessing
-	}
-	if rowsAffected == 0 {
+	if u, _ := r.GetById(ctx, user.ID); u == nil {
 		return apperrors.ErrUserNotFound
+	}
+
+	query := "UPDATE account SET email=$1, passwordhash=$2, updatedAt=current_timestamp WHERE id=$3 RETURNING createdAt, updatedAt"
+
+	row := r.db.QueryRowContext(ctx, query, user.Email, user.Passwordhash, user.ID)
+	err := row.Scan(&user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		r.logger.Warning(err.Error())
+		return apperrors.ErrDbQueryProcessing
 	}
 
 	return nil
