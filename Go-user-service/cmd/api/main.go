@@ -1,20 +1,22 @@
 package main
 
 import (
-	"Golang-practice-2023/internal/transport/rest/handler"
+	"Golang-practice-2023/internal/domain/user"
 	"Golang-practice-2023/internal/user/repository"
 	"Golang-practice-2023/internal/user/service"
 	"Golang-practice-2023/pkg/health"
 	"Golang-practice-2023/pkg/logger"
 	"Golang-practice-2023/pkg/migration"
 	"Golang-practice-2023/pkg/pgconnect"
-	"Golang-practice-2023/pkg/pubsub/nats/pub"
+	"Golang-practice-2023/pkg/pubsub/nats/sub"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"github.com/nats-io/nats.go"
 	"github.com/rs/zerolog"
 	"log"
 	"net/http"
@@ -68,27 +70,35 @@ func main() {
 		}
 	}
 
-	publisher, err := pub.New(fmt.Sprintf("nats://%s:%s", os.Getenv("NATS_HOST"), os.Getenv("NATS_PORT")), myLogger)
-	if err != nil {
-		myLogger.Fatal(fmt.Sprintf("Failed to connect NATS: %s", err.Error()))
-	}
+	userRepository := repository.New(db, myLogger)
+	userService := service.New(userRepository, myLogger)
 
-	//subscriber, err := sub.New(fmt.Sprintf("nats://%s:%s", os.Getenv("NATS_HOST"), os.Getenv("NATS_PORT")), myLogger)
-	//_, err = subscriber.Subscribe("NewUser", func(msg *nats.Msg) {
-	//	fmt.Println("Received message: " + string(msg.Data))
-	//})
+	ctx := context.Background() // todo
+
+	subscriber, err := sub.New(fmt.Sprintf("nats://%s:%s", os.Getenv("NATS_HOST"), os.Getenv("NATS_PORT")), myLogger)
+	_, err = subscriber.Subscribe("NewUser", func(msg *nats.Msg) {
+		fmt.Println("Received message: " + string(msg.Data))
+
+		var newUser *user.User
+		err := json.Unmarshal(msg.Data, &newUser)
+		if err != nil {
+			myLogger.Warning("Failed to unmarshal user")
+		} else {
+			err := userService.Save(ctx, newUser)
+			if err != nil {
+				myLogger.Warning("Failed to create user " + err.Error())
+			}
+		}
+	})
+
 	if err != nil {
 		myLogger.Warning("Failed to subscribe")
 	}
 
-	userRepository := repository.New(db, myLogger)
-	userService := service.New(userRepository, myLogger, publisher)
-	userHandler := handler.New(userService, myLogger)
-
-	port := os.Getenv("PORT")
+	defer cancel()
+	defer subscriber.Conn.Close()
 
 	router := mux.NewRouter()
-	userHandler.InitRoutes(router)
 	router.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
@@ -98,9 +108,7 @@ func main() {
 		}
 	})
 
-	defer cancel()
-	defer publisher.Conn.Close()
-
+	port := os.Getenv("PORT")
 	srv := &http.Server{
 		Addr:    ":" + port,
 		Handler: router,

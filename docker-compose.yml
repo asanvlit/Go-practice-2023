@@ -3,8 +3,6 @@ version: '3'
 networks:
   api:
     driver: bridge
-  api2:
-    driver: bridge
 
 services:
   nats:
@@ -13,7 +11,6 @@ services:
       - "4222:4222"
     networks:
       - api
-      - api2
   pg:
     build:
       dockerfile: Go-auth-service/deployments/DockerfileDb
@@ -21,13 +18,30 @@ services:
       - "5433:5432"
     networks:
       - api
-      - api2
+  pg2:
+    build:
+      dockerfile: Go-user-service/deployments/DockerfileDb
+    ports:
+      - "5434:5432"
+    networks:
+      - api
   go-auth:
     build:
       context: ./Go-auth-service
       dockerfile: Dockerfile
+    environment:
+      - POSTGRES_HOST=pg
     ports:
       - "8081:8080"
     networks:
       - api
-      - api2
+  go-users:
+    build:
+      context: ./Go-user-service
+      dockerfile: Dockerfile
+    environment:
+      - POSTGRES_HOST=pg2
+    ports:
+      - "8082:8080"
+    networks:
+      - api

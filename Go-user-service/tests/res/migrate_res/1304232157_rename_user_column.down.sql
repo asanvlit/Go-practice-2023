@@ -1,0 +1,1 @@
+ALTER TABLE account RENAME COLUMN passwordHash TO password_hash
