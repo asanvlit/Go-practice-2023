@@ -15,7 +15,7 @@ import (
 func TestConnectDatabase(t *testing.T) {
 	envPath, envErr := filepath.Abs("../../configs/test.env")
 	if envErr != nil {
-		t.Log("Can't get environment file") // todo t.log
+		t.Log("Can't get environment file")
 	}
 
 	err := godotenv.Load(envPath)

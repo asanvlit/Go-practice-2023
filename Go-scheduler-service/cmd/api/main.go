@@ -52,7 +52,7 @@ func main() {
 
 	defer cancel()
 
-	scheduler := scheduler2.New("localhost", 8080, "/user", 1, 5, myLogger)
+	scheduler := scheduler2.New("go-auth", 8080, "/user", 1, 5, myLogger)
 	go func() {
 		scheduler.ScheduleUsers()
 	}()

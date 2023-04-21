@@ -7,7 +7,6 @@ import (
 	"Golang-practice-2023/internal/user/service"
 	"Golang-practice-2023/pkg/migration"
 	"Golang-practice-2023/pkg/pgconnect"
-	"Golang-practice-2023/pkg/pubsub/nats/pub"
 	"Golang-practice-2023/tests/data/provider"
 	"errors"
 	"github.com/golang-migrate/migrate/v4"
@@ -53,8 +52,8 @@ func NewUserRepository(db *sqlx.DB, logger logger.Logger) (*repository.Repositor
 	return repository.New(db, logger), nil
 }
 
-func NewUserService(repository user.Repository, logger logger.Logger, nats *pub.NatsPublisher) (*service.Service, error) {
-	return service.New(repository, logger, nats), nil
+func NewUserService(repository user.Repository, logger logger.Logger) (*service.Service, error) {
+	return service.New(repository, logger), nil
 }
 
 func NewUserDataProvider() (*provider.UserDataProvider, error) {

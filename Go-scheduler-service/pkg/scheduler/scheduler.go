@@ -56,7 +56,7 @@ func (s *Scheduler) ScheduleUsers() {
 }
 
 func (s *Scheduler) getUsers(offset int) ([]user.User, error) {
-	url := "http://" + "go-auth" + ":" + strconv.Itoa(s.port) + s.url + "?offset=" + strconv.Itoa(offset) + "&limit=" + strconv.Itoa(s.limit)
+	url := "http://" + s.host + ":" + strconv.Itoa(s.port) + s.url + "?offset=" + strconv.Itoa(offset) + "&limit=" + strconv.Itoa(s.limit)
 	s.logger.Info(fmt.Sprintf("Send query to get users %s ...", url))
 
 	client := &http.Client{Timeout: 5 * time.Second}

@@ -73,7 +73,7 @@ func main() {
 	userRepository := repository.New(db, myLogger)
 	userService := service.New(userRepository, myLogger)
 
-	ctx := context.Background() // todo
+	ctx := context.Background()
 
 	subscriber, err := sub.New(fmt.Sprintf("nats://%s:%s", os.Getenv("NATS_HOST"), os.Getenv("NATS_PORT")), myLogger)
 	_, err = subscriber.Subscribe("NewUser", func(msg *nats.Msg) {
