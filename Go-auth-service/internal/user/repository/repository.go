@@ -5,6 +5,7 @@ import (
 	"Golang-practice-2023/internal/domain/logger"
 	"Golang-practice-2023/internal/domain/user"
 	"context"
+	"database/sql"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
@@ -52,7 +53,7 @@ func (r *Repository) GetById(ctx context.Context, id uuid.UUID) (*user.User, err
 }
 
 func (r *Repository) GetByEmail(ctx context.Context, email string) (*user.User, error) {
-	query := "SELECT id, email, passwordhash, createdAt, updatedAt  FROM account WHERE email=$1"
+	query := "SELECT id, email, passwordhash, createdAt, updatedAt FROM account WHERE email=$1"
 
 	var u user.User
 	err := r.db.GetContext(ctx, &u, query, email)
@@ -61,6 +62,22 @@ func (r *Repository) GetByEmail(ctx context.Context, email string) (*user.User, 
 	}
 
 	return &u, nil
+}
+
+func (r *Repository) GetWithOffsetAndLimit(ctx context.Context, offset int, limit int) (*[]user.User, error) {
+	var users []user.User
+
+	query := "SELECT id, email, passwordhash, createdAt, updatedAt FROM account ORDER BY createdat OFFSET $1 LIMIT $2"
+
+	err := r.db.SelectContext(ctx, &users, query, offset, limit)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return &users, nil
+		}
+		return nil, apperrors.ErrDbQueryProcessing
+	}
+
+	return &users, nil
 }
 
 func (r *Repository) Update(ctx context.Context, user *user.User) error {

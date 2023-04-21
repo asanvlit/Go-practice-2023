@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"net/http"
+	"strconv"
 )
 
 const contentType = "application/json"
@@ -27,6 +28,7 @@ func (h *UserHandler) InitRoutes(router *mux.Router) {
 	router.HandleFunc("/user", h.Create).Methods(http.MethodPost)
 	router.HandleFunc("/user/{id}", h.Update).Methods(http.MethodPut)
 	router.HandleFunc("/user/{id}", h.GetById).Methods(http.MethodGet)
+	router.HandleFunc("/user", h.GetWithOffsetAndLimit).Methods(http.MethodGet).Queries("offset", "{offset}", "limit", "{limit}")
 	router.HandleFunc("/user/{id}", h.Delete).Methods(http.MethodDelete)
 }
 
@@ -87,6 +89,41 @@ func (h *UserHandler) GetById(w http.ResponseWriter, r *http.Request) {
 
 	if err := myHttp.WriteResponse(&u, w, contentType, http.StatusOK); err != nil {
 		h.logger.Warning(fmt.Sprintf("Error: unable to marshal order struct: %v ", u))
+	}
+}
+
+func (h *UserHandler) GetWithOffsetAndLimit(w http.ResponseWriter, r *http.Request) {
+	offsetStr := r.URL.Query().Get("offset")
+	limitStr := r.URL.Query().Get("limit")
+
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil {
+		err := HandleError(w, apperrors.ErrInvalidOffsetFormat)
+		if err != nil {
+			h.logger.Warning(fmt.Sprintf("Failed to write response: %s", err.Error()))
+		}
+		return
+	}
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		err := HandleError(w, apperrors.ErrInvalidLimitFormat)
+		if err != nil {
+			h.logger.Warning(fmt.Sprintf("Failed to write response: %s", err.Error()))
+		}
+		return
+	}
+
+	var users *[]user.User
+	if users, err = h.service.GetWithOffsetAndLimit(r.Context(), offset, limit); err != nil {
+		err := HandleError(w, err)
+		if err != nil {
+			h.logger.Warning(fmt.Sprintf("Failed to write response: %s", err.Error()))
+		}
+		return
+	}
+
+	if err := myHttp.WriteResponse(&users, w, contentType, http.StatusOK); err != nil {
+		h.logger.Warning(fmt.Sprintf("Error: unable to marshal order struct"))
 	}
 }
 

@@ -45,3 +45,12 @@ services:
       - "8082:8080"
     networks:
       - api
+  go-scheduler:
+    build:
+      context: ./Go-scheduler-service
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8080"
+    networks:
+      - api
+

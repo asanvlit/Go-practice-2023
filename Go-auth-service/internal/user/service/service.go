@@ -58,6 +58,14 @@ func (service *Service) GetById(ctx context.Context, id uuid.UUID) (*user.User, 
 	return service.repository.GetById(ctx, id)
 }
 
+func (service *Service) GetByEmail(ctx context.Context, email string) (*user.User, error) {
+	return service.repository.GetByEmail(ctx, email)
+}
+
+func (service *Service) GetWithOffsetAndLimit(ctx context.Context, offset int, limit int) (*[]user.User, error) {
+	return service.repository.GetWithOffsetAndLimit(ctx, offset, limit)
+}
+
 func (service *Service) Update(ctx context.Context, user *user.User) error {
 	_, err := service.GetById(ctx, user.ID)
 	if err != nil {
