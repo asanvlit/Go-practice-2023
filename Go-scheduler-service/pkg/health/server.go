@@ -3,6 +3,7 @@ package health
 import (
 	"Go-scheduler-service/internal/domain/logger"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -12,14 +13,15 @@ import (
 type Server struct {
 	Srv         *http.Server
 	healthPort  int
-	host        string
 	pingFreq    int
+	pingHost    string
+	pingPort    int
 	pingUrl     string
 	stopChannel chan os.Signal
 	logger      logger.Logger
 }
 
-func New(healthPort int, pingHost string, pingUrl string, freq int, logger logger.Logger, stopChannel chan os.Signal) (*Server, error) {
+func New(healthPort int, pingHost string, pingPort int, pingUrl string, freq int, logger logger.Logger, stopChannel chan os.Signal) (*Server, error) {
 	srv := &http.Server{
 		Addr: ":" + strconv.Itoa(healthPort),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -36,8 +38,9 @@ func New(healthPort int, pingHost string, pingUrl string, freq int, logger logge
 	return &Server{
 		Srv:         srv,
 		healthPort:  healthPort,
-		host:        pingHost,
 		pingFreq:    freq,
+		pingHost:    pingHost,
+		pingPort:    pingPort,
 		pingUrl:     pingUrl,
 		stopChannel: stopChannel,
 		logger:      logger,
@@ -51,7 +54,7 @@ func (hs *Server) HealthCheck() {
 	for {
 		select {
 		case <-pingTimer.C:
-			url := "http://" + hs.host + ":" + strconv.Itoa(hs.healthPort) + hs.pingUrl
+			url := "http://" + hs.pingHost + ":" + strconv.Itoa(hs.pingPort) + hs.pingUrl
 			hs.logger.Info(fmt.Sprintf("Ping %s ...", url))
 
 			client := &http.Client{Timeout: 5 * time.Second}
@@ -59,6 +62,12 @@ func (hs *Server) HealthCheck() {
 			resp, err := client.Get(url)
 
 			if err == nil && resp.StatusCode == http.StatusOK {
+				res, err := io.ReadAll(resp.Body)
+				if err != nil {
+					hs.logger.Warning(fmt.Sprintf("Failed to decode response: %s", err.Error()))
+				} else {
+					hs.logger.Info(fmt.Sprintf("Received response: %v", string(res)))
+				}
 				hs.logger.Info("Ping successful.")
 			} else {
 				hs.logger.Warning("Unsuccessful ping.")

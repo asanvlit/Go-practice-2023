@@ -92,7 +92,7 @@ func main() {
 	router.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
-		_, err := w.Write([]byte(fmt.Sprintf("[%s] pong", time.Now())))
+		_, err := w.Write([]byte(fmt.Sprintf("[%s] Pong!", time.Now())))
 		if err != nil {
 			myLogger.Warning("Failed to write response")
 		}
@@ -125,7 +125,11 @@ func main() {
 	if err != nil {
 		myLogger.Fatal(fmt.Sprintf("Failed to get health port: %s", err.Error()))
 	}
-	healthSrv, err := health.New(healthPort, os.Getenv("HOST"), "/ping", 5, myLogger, c)
+	pingPort, err := strconv.Atoi(os.Getenv("PORT"))
+	if err != nil {
+		myLogger.Error("Failed to get PORT")
+	}
+	healthSrv, err := health.New(healthPort, os.Getenv("HOST"), pingPort, "/ping", 1, myLogger, c)
 	if err != nil {
 		myLogger.Fatal(fmt.Sprintf("Failed to start Health server: %s", err))
 	}
