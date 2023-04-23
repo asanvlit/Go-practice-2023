@@ -45,7 +45,7 @@ func (s *Scheduler) ScheduleUsers() {
 			}
 
 			if users != nil {
-				offset += len(users) - 1
+				offset += len(users)
 				s.logger.Info(fmt.Sprintf("%v", users))
 			} else {
 				s.logger.Info("No more users")
