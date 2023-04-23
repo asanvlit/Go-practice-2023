@@ -42,11 +42,10 @@ func (s *Scheduler) ScheduleUsers() {
 			if err != nil {
 				s.logger.Warning(fmt.Sprintf("Error getting users in scheduler: %s", err.Error()))
 				continue
-			} else {
-				offset += s.limit
 			}
 
 			if users != nil {
+				offset += len(users) - 1
 				s.logger.Info(fmt.Sprintf("%v", users))
 			} else {
 				s.logger.Info("No more users")
