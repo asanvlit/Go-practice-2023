@@ -1,0 +1,7 @@
+FROM postgres:13-alpine
+
+ENV POSTGRES_PASSWORD=qwerty007
+
+EXPOSE 5432
+
+

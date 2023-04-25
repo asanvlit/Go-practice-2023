@@ -1,52 +1,70 @@
 package scheduler
 
 import (
+	"Go-scheduler-service/internal/domain/apperrors"
 	"Go-scheduler-service/internal/domain/logger"
 	"Go-scheduler-service/internal/domain/user"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type Scheduler struct {
-	host   string
-	port   int
-	url    string
-	freq   int
-	limit  int
-	logger logger.Logger
+	userService       user.Service
+	host              string
+	port              int
+	url               string
+	usersFreqInterval int
+	limit             int
+	logger            logger.Logger
 }
 
-func New(host string, port int, url string, freq int, limit int, logger logger.Logger) *Scheduler {
+func New(userService user.Service, host string, port int, url string, usersFreqInterval int, limit int, logger logger.Logger) *Scheduler {
 	return &Scheduler{
-		host:   host,
-		port:   port,
-		url:    url,
-		freq:   freq,
-		limit:  limit,
-		logger: logger,
+		userService:       userService,
+		host:              host,
+		port:              port,
+		url:               url,
+		usersFreqInterval: usersFreqInterval,
+		limit:             limit,
+		logger:            logger,
 	}
 }
 
-func (s *Scheduler) ScheduleUsers() {
-	pingTimer := time.NewTicker(time.Duration(s.freq) * time.Minute)
+func (s *Scheduler) ScheduleUsers(ctx context.Context) {
+	pingTimer := time.NewTicker(time.Duration(s.usersFreqInterval) * time.Minute)
 	defer pingTimer.Stop()
 
-	offset := 0
 	for {
 		select {
 		case <-pingTimer.C:
-			users, err := s.getUsers(offset)
+			lastRegisteredUser, err := s.userService.GetLastRegisteredUser(ctx)
+			var lastRegisteredUserDate string
+			if err == apperrors.ErrUserNotFound {
+				lastRegisteredUserDate = "2000-04-23 10:03:32.670268"
+			} else {
+				lastRegisteredUserDate = lastRegisteredUser.CreatedAt.String()[0:26]
+				s.logger.Info(fmt.Sprintf("Last registered user register date: %s", lastRegisteredUserDate))
+			}
+
+			users, err := s.getNewUsers(lastRegisteredUserDate)
 			if err != nil {
-				s.logger.Warning(fmt.Sprintf("Error getting users in scheduler: %s", err.Error()))
+				s.logger.Error(fmt.Sprintf("Error getting users in scheduler: %s", err.Error()))
 				continue
 			}
 
 			if users != nil {
-				offset += len(users)
 				s.logger.Info(fmt.Sprintf("%v", users))
+				for _, u := range users {
+					err := s.userService.Save(ctx, &u)
+					if err != nil {
+						s.logger.Warning(fmt.Sprintf("Error while saving new user [got in scheduler]: %s", err))
+					}
+				}
 			} else {
 				s.logger.Info("No more users")
 			}
@@ -54,8 +72,10 @@ func (s *Scheduler) ScheduleUsers() {
 	}
 }
 
-func (s *Scheduler) getUsers(offset int) ([]user.User, error) {
-	url := "http://" + s.host + ":" + strconv.Itoa(s.port) + s.url + "?offset=" + strconv.Itoa(offset) + "&limit=" + strconv.Itoa(s.limit)
+func (s *Scheduler) getNewUsers(lastRegisteredUserDate string) ([]user.User, error) {
+	url := "http://" + s.host + ":" + strconv.Itoa(s.port) + s.url + "?date=" + lastRegisteredUserDate + "&limit=" + strconv.Itoa(s.limit)
+	url = strings.Replace(url, " ", "%20", -1)
+
 	s.logger.Info(fmt.Sprintf("Send query to get users %s ...", url))
 
 	client := &http.Client{Timeout: 5 * time.Second}

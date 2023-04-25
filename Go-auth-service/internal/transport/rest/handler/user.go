@@ -29,6 +29,7 @@ func (h *UserHandler) InitRoutes(router *mux.Router) {
 	router.HandleFunc("/user/{id}", h.Update).Methods(http.MethodPut)
 	router.HandleFunc("/user/{id}", h.GetById).Methods(http.MethodGet)
 	router.HandleFunc("/user", h.GetWithOffsetAndLimit).Methods(http.MethodGet).Queries("offset", "{offset}", "limit", "{limit}")
+	router.HandleFunc("/user", h.GetRegisteredLaterThen).Methods(http.MethodGet).Queries("date", "{date}")
 	router.HandleFunc("/user/{id}", h.Delete).Methods(http.MethodDelete)
 }
 
@@ -115,6 +116,52 @@ func (h *UserHandler) GetWithOffsetAndLimit(w http.ResponseWriter, r *http.Reque
 
 	var users *[]user.User
 	if users, err = h.service.GetWithOffsetAndLimit(r.Context(), offset, limit); err != nil {
+		err := HandleError(w, err)
+		if err != nil {
+			h.logger.Warning(fmt.Sprintf("Failed to write response: %s", err.Error()))
+		}
+		return
+	}
+
+	if err := myHttp.WriteResponse(&users, w, contentType, http.StatusOK); err != nil {
+		h.logger.Warning(fmt.Sprintf("Error: unable to marshal order struct"))
+	}
+}
+
+func (h *UserHandler) GetRegisteredLaterThen(w http.ResponseWriter, r *http.Request) {
+	registerDateString := r.URL.Query().Get("date")
+	limitStr := r.URL.Query().Get("limit")
+
+	// todo param check
+	//layoutTimestamp := "2023-04-23 10:03:32.620"
+	//registerDate, err := time.Parse(registerDateString, layoutTimestamp)
+	//if err != nil {
+	//    h.logger.Warning(fmt.Sprintf("Failed to convert string date to time.Time(): %s", err.Error()))
+	//    err := HandleError(w, apperrors.ErrInvalidDateFormat)
+	//    if err != nil {
+	//        h.logger.Warning(fmt.Sprintf("Failed to write response: %s", err.Error()))
+	//    }
+	//    return
+	//}
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		err := HandleError(w, apperrors.ErrInvalidLimitFormat)
+		if err != nil {
+			h.logger.Warning(fmt.Sprintf("Failed to write response: %s", err.Error()))
+		}
+		return
+	}
+
+	if err != nil {
+		err := HandleError(w, apperrors.ErrInvalidOffsetFormat)
+		if err != nil {
+			h.logger.Warning(fmt.Sprintf("Failed to write response: %s", err.Error()))
+		}
+		return
+	}
+
+	var users *[]user.User
+	if users, err = h.service.GetRegisteredLaterThenWithLimit(r.Context(), registerDateString, limit); err != nil {
 		err := HandleError(w, err)
 		if err != nil {
 			h.logger.Warning(fmt.Sprintf("Failed to write response: %s", err.Error()))

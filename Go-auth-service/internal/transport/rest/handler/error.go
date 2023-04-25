@@ -19,7 +19,7 @@ func HandleError(w http.ResponseWriter, err error) error {
 		err := myHttp.WriteResponse(Error{Code: 404, Message: err.Error()}, w, contentType, http.StatusNotFound)
 		return err
 	case apperrors.ErrInvalidEmailFormat, apperrors.ErrInvalidPasswordFormat, apperrors.ErrInvalidRequestFormat,
-		apperrors.ErrInvalidRequestBody, apperrors.ErrInvalidIdFormat, apperrors.ErrAlreadyRegisteredUserEmail:
+		apperrors.ErrInvalidRequestBody, apperrors.ErrInvalidIdFormat, apperrors.ErrAlreadyRegisteredUserEmail, apperrors.ErrInvalidDateFormat:
 		err := myHttp.WriteResponse(Error{Code: 400, Message: err.Error()}, w, contentType, http.StatusBadRequest)
 		return err
 	case apperrors.ErrInternalJsonProcessing, apperrors.ErrNatsPublishing, apperrors.ErrDbQueryProcessing:

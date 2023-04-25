@@ -25,6 +25,13 @@ services:
       - "5434:5432"
     networks:
       - api
+  pg3:
+    build:
+      dockerfile: Go-scheduler-service/deployments/DockerfileDb
+    ports:
+      - "5435:5432"
+    networks:
+      - api
   go-auth:
     build:
       context: ./Go-auth-service
@@ -55,7 +62,11 @@ services:
     build:
       context: ./Go-scheduler-service
       dockerfile: Dockerfile
+    environment:
+      - POSTGRES_HOST=pg3
     ports:
       - "8083:8080"
     networks:
       - api
+    depends_on:
+      - pg3

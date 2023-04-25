@@ -11,6 +11,7 @@ var ErrInvalidRequestBody = errors.New("invalid request body")
 var ErrInvalidIdFormat = errors.New("invalid id format (not uuid)")
 var ErrInvalidOffsetFormat = errors.New("invalid offset format")
 var ErrInvalidLimitFormat = errors.New("invalid limit format")
+var ErrInvalidDateFormat = errors.New("invalid date format")
 
 var ErrInternalJsonProcessing = errors.New("failed to process json")
 var ErrNatsPublishing = errors.New("failed to publish message to NATS")

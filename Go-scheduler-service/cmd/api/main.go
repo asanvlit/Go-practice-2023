@@ -1,11 +1,17 @@
 package main
 
 import (
+	"Go-scheduler-service/internal/user/repository"
+	"Go-scheduler-service/internal/user/service"
 	"Go-scheduler-service/pkg/health"
 	"Go-scheduler-service/pkg/logger"
+	"Go-scheduler-service/pkg/migration"
+	"Go-scheduler-service/pkg/pgconnect"
 	scheduler2 "Go-scheduler-service/pkg/scheduler"
 	"context"
+	"errors"
 	"fmt"
+	"github.com/golang-migrate/migrate/v4"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
@@ -36,7 +42,7 @@ func main() {
 		log.Fatal(fmt.Sprintf("Error creating logger: %s", err))
 	}
 
-	_, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx := context.Background()
 
 	port := os.Getenv("PORT")
 
@@ -50,11 +56,35 @@ func main() {
 		}
 	})
 
-	defer cancel()
+	pgPort, err := strconv.Atoi(os.Getenv("POSTGRES_PORT"))
+	if err != nil {
+		myLogger.Fatal(fmt.Sprintf("Failed to get Postgresql port: %s", err))
+	}
+	db, err := pgconnect.ConnectDatabase(pgconnect.ConnectionConfigData{
+		Username:     os.Getenv("POSTGRES_USERNAME"),
+		Password:     os.Getenv("POSTGRES_PASSWORD"),
+		DatabaseName: os.Getenv("POSTGRES_DATABASE"),
+		Port:         pgPort,
+		Host:         os.Getenv("POSTGRES_HOST"),
+	})
+	_ = db
 
-	scheduler := scheduler2.New("go-auth", 8080, "/user", 1, 5, myLogger)
+	migrationData, err := migration.New(db.DB, "file://schemas")
+	err = migrationData.Up()
+	if err != nil {
+		if errors.Is(err, migrate.ErrNoChange) {
+			myLogger.Warning(fmt.Sprintf("Did not migrate: %s", err.Error()))
+		} else {
+			myLogger.Fatal(fmt.Sprintf("Failed to migrate: %s", err.Error()))
+		}
+	}
+
+	userRepository := repository.New(db, myLogger)
+	userService := service.New(userRepository, myLogger)
+
+	scheduler := scheduler2.New(userService, "go-auth", 8080, "/user", 1, 5, myLogger)
 	go func() {
-		scheduler.ScheduleUsers()
+		scheduler.ScheduleUsers(ctx)
 	}()
 
 	srv := &http.Server{

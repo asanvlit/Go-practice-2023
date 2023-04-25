@@ -1,14 +1,12 @@
 package service
 
 import (
-	"Golang-practice-2023/internal/domain/apperrors"
-	"Golang-practice-2023/internal/domain/logger"
-	"Golang-practice-2023/internal/domain/user"
-	"Golang-practice-2023/pkg/pubsub/nats/pub"
+	"Go-scheduler-service/internal/domain/apperrors"
+	"Go-scheduler-service/internal/domain/logger"
+	"Go-scheduler-service/internal/domain/user"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"github.com/google/uuid"
 	"regexp"
 )
@@ -16,11 +14,10 @@ import (
 type Service struct {
 	repository user.Repository
 	logger     logger.Logger
-	nats       *pub.NatsPublisher
 }
 
-func New(repository user.Repository, logger logger.Logger, nats *pub.NatsPublisher) *Service {
-	return &Service{repository: repository, logger: logger, nats: nats}
+func New(repository user.Repository, logger logger.Logger) *Service {
+	return &Service{repository: repository, logger: logger}
 }
 
 func (service *Service) Create(ctx context.Context, user *user.User) error {
@@ -39,19 +36,12 @@ func (service *Service) Create(ctx context.Context, user *user.User) error {
 		return err
 	}
 
-	createdUserData, err := json.Marshal(user)
-	if err != nil {
-		service.logger.Warning("Failed to marshal user")
-		return apperrors.ErrInternalJsonProcessing
-	}
-
-	err = service.nats.Publish("NewUser", createdUserData)
-	if err != nil {
-		service.logger.Warning("Failed to push user data to nats")
-		return apperrors.ErrNatsPublishing
-	}
-
 	return err
+}
+
+func (service *Service) Save(ctx context.Context, user *user.User) error {
+	createdUser := service.repository.Save(ctx, user)
+	return createdUser
 }
 
 func (service *Service) GetById(ctx context.Context, id uuid.UUID) (*user.User, error) {
@@ -68,6 +58,10 @@ func (service *Service) GetWithOffsetAndLimit(ctx context.Context, offset int, l
 
 func (service *Service) GetRegisteredLaterThenWithLimit(ctx context.Context, registerDate string, limit int) (*[]user.User, error) {
 	return service.repository.GetRegisteredLaterThen(ctx, registerDate, limit)
+}
+
+func (service *Service) GetLastRegisteredUser(ctx context.Context) (*user.User, error) {
+	return service.repository.GetLastRegisteredUser(ctx)
 }
 
 func (service *Service) Update(ctx context.Context, user *user.User) error {

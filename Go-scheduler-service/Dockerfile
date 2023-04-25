@@ -12,5 +12,6 @@ FROM scratch
 ENV NAME "go_scheduler"
 COPY --from=build /opt/${NAME}/bin/${NAME} /${NAME}
 COPY --from=build /opt/${NAME}/configs/dev.env /dev.env
+COPY --from=build /opt/${NAME}/schemas /schemas
 
 CMD ["./go_scheduler"]
