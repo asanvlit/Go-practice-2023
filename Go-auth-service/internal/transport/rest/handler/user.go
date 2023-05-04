@@ -132,17 +132,6 @@ func (h *UserHandler) GetRegisteredLaterThen(w http.ResponseWriter, r *http.Requ
 	registerDateString := r.URL.Query().Get("date")
 	limitStr := r.URL.Query().Get("limit")
 
-	// todo param check
-	//layoutTimestamp := "2023-04-23 10:03:32.620"
-	//registerDate, err := time.Parse(registerDateString, layoutTimestamp)
-	//if err != nil {
-	//    h.logger.Warning(fmt.Sprintf("Failed to convert string date to time.Time(): %s", err.Error()))
-	//    err := HandleError(w, apperrors.ErrInvalidDateFormat)
-	//    if err != nil {
-	//        h.logger.Warning(fmt.Sprintf("Failed to write response: %s", err.Error()))
-	//    }
-	//    return
-	//}
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil {
 		err := HandleError(w, apperrors.ErrInvalidLimitFormat)
